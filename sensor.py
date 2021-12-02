@@ -1,20 +1,25 @@
-from multiprocessing.queues import Queue
-import queue
-import threading
+import paho.mqtt.client as mqtt
+import random as rand
 import time
-import random
-from multiprocessing import Process, Queue
 
+class Sensor:
+    def __init__(self, ip='127.0.0.255', port=1883):
+        self.client = mqtt.Client(client_id="Sensor")
+        self.client.on_connect = self.on_connect
+        self.client.connect(ip, port=port)
+        self.client.loop_start()
 
-class Sensor(Process):
-    def __init__(self, queue : Queue) -> None:
-        super().__init__()
-        self.queue = queue
+    # Envoie un nombre aléatoire sur le réseau MQTT
+    def send_rand(self):
+        x = rand.uniform(-1,50)
+        self.client.publish("/sensor", x)
 
-    
-    def run(self) -> None:
+    # Action lorsque le capteur c'est bien connecté au réseau MQTT
+    def on_connect(self, client, userdata, flag, rc):
+        print("Sensor connecte !")
 
-        while True:
-            self.queue.put(random.randint(0, 10))
-            #print(self.queue.qsize())
-            time.sleep(0.2)
+    def run(self):
+        # Envoie d'un nombre aléatoire chaque seconde
+        while(True) :
+            self.send_rand()
+            time.sleep(1)
