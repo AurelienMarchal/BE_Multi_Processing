@@ -16,5 +16,5 @@ class Sensor(Process):
 
         while True:
             self.queue.put(random.randint(0, 10))
-            print(self.queue.qsize())
+            #print(self.queue.qsize())
             time.sleep(0.2)
