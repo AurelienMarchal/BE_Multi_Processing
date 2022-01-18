@@ -36,8 +36,7 @@ class DataBase(Process):
 
     def start(self):
         self.client.connect(self.ip, port=self.port)
-        self.client.subscribe("/server/getBackup")
-        self.client.subscribe("/sensor/msg")
+        self.client.subscribe("/server0/output")
         self.client.subscribe("/dataBase/kill")
         self.client.loop_start()
         self.isAlive = True
@@ -55,22 +54,10 @@ class DataBase(Process):
             self.isAlive = False
             return
 
-        if msg.topic == "/sensor/msg":
+        if msg.topic == "/server0/output":
             value = float(msg.payload.decode("utf-8"))
             self.store_in_memory(value)
-
-        if msg.topic == "/server/getBackup":
-            self.sendBackup()
-            return
         return
-
-    def sendBackup(self):
-        with open(self.file_path, mode='r') as f:
-            for line in (f.readLines() [-10,:]):
-                value = float(line)
-                self.client.publish("/server/getBackup", value)
-        f.close()
-        pass
 
     def store_in_memory(self, value):
         with open(self.file_path, mode='a') as f:

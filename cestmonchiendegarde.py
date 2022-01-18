@@ -24,7 +24,7 @@ class ChiengDeGarde:
     def start(self):
         self.client.connect(self.ip, port=self.port)
         self.client.subscribe("/cdg/kill")
-        self.client.subscribe("/server/state")
+        self.client.subscribe("/server0/state")
         self.client.loop_start()
 
         self.isAlive = True
@@ -38,7 +38,7 @@ class ChiengDeGarde:
             self.isAlive = False
             return
 
-        if msg.topic == "/server/state":
+        if msg.topic == "/server0/state":
             self.lastPing = datetime.now()
 
         return
@@ -55,7 +55,7 @@ class ChiengDeGarde:
 
         if d.total_seconds() >= 3:
             print("Wouf, le server est dead")
-            subprocess.run("python server.py restart")
+            self.client.publish("/server1", "")
         pass
 
 
