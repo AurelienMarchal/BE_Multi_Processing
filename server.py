@@ -11,7 +11,7 @@ from scipy import rand
 class Server(Process):
     def __init__(self, restart=False, ip="127.0.0.1", port=1883) -> None:
         self.RAM = np.array([])  # Memoire vive du server
-        
+
         # MQTT
         self.client = mqtt.Client(client_id="Server")
         self.client.on_connect = self.on_connect
@@ -21,9 +21,8 @@ class Server(Process):
         if restart:
             # On va récup les valeurs dans la backup
             self.getBackup()
-            pass
 
-        self.mode = 0 # 0 : Mode PRIMARY / 1 : Mode BACKUP
+        self.mode = 0  # 0 : Mode PRIMARY / 1 : Mode BACKUP
 
         self.port = port
         self.ip = ip
@@ -34,6 +33,7 @@ class Server(Process):
         self.client.connect(self.ip, port=self.port)
         self.client.subscribe("/server/kill")
         self.client.subscribe("/sensor/msg")
+        self.client.subscribe("/server/getBackup")
         self.client.loop_start()
 
         self.isAlive = True
@@ -41,7 +41,7 @@ class Server(Process):
     def on_connect(self, client, userdata, flag, rc):
         pass
 
-    def on_msg(self, client, userdata, msg) -> None :
+    def on_msg(self, client, userdata, msg) -> None:
         if msg.topic == "/server/kill":
             self.isAlive = False
             return
@@ -65,43 +65,29 @@ class Server(Process):
                 pass
 
     def getBackup(self):
-        self.client.publish("/dataBase/getBackup", True)
-
+        self.client.publish("/dataBase/getBackup", "True")
 
     def run(self) -> None:
-        
         while self.isAlive:
-            if self.mode == 0: # Mode PRIMARY
+            if self.mode == 0:  # Mode PRIMARY
                 # Watchdog
                 self.coupDePiedAuChienDeGarde()
 
                 # Lecture du capteur
-                    # Fait de maniere implicite (stocké dans la RAM)
+                # Fait de maniere implicite (stocké dans la RAM)
                 # Calcul 
                 value = self.calc_mean_value()
                 # Affichage
                 # print(f"{value}")
                 self.client.publish("/server/output", value)
                 # Stockage
-                
-                
-                #print(f'Taille de la mémoire : {len(self.memory)}')
 
-            else : # Mode BACKUP
+                # print(f'Taille de la mémoire : {len(self.memory)}')
+
+            else:  # Mode BACKUP
                 pass
 
             time.sleep(0.5)
-
-    def store_in_memory(self):
-        if not self.queue_sensor.empty():
-            value = self.queue_sensor.get()
-            self.memory.append(value)
-            if len(self.memory) > self.nb_values:
-                self.memory.pop(0)
-            self.send_value_to_data_base(value)
-
-    def send_value_to_data_base(self, value):
-        self.queue_data_base.put(value)
 
     def calc_mean_value(self):
         if len(self.RAM) == 0:
@@ -117,8 +103,6 @@ class Server(Process):
 
     def coupDePiedAuChienDeGarde(self):
         self.client.publish("/server/state", "I'm alive")
-
-        pass
 
 
 if __name__ == "__main__":

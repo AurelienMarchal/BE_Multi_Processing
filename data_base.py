@@ -1,18 +1,16 @@
-from multiprocessing import Process, Queue
+from multiprocessing import Process
 import paho.mqtt.client as mqtt
+import numpy as np
 import os
 import time
 import sys
 
 
 class DataBase(Process):
-
     COUNT = 0
 
-    def __init__(self, ip='127.0.0.255', port=1883):
-        super().__init__()
-
-        self.queue = Queue()
+    def __init__(self, ip='127.0.0.1', port=1883):
+        self.RAM = np.array([])  # Memoire vive du server
         self.isAlive = False
 
         self.client = mqtt.Client(client_id="DataBase")
@@ -36,15 +34,14 @@ class DataBase(Process):
 
     def start(self):
         self.client.connect(self.ip, port=self.port)
-        self.client.subscribe("/server/getBackup")
-        self.client.subscribe("/sensor/msg")
+        self.client.subscribe("/dataBase/getBackup")
+        self.client.subscribe("/server/output")
         self.client.subscribe("/dataBase/kill")
         self.client.loop_start()
         self.isAlive = True
 
     def run(self) -> None:
         while self.isAlive:
-
             time.sleep(0.1)
 
     def on_connect(self, client, userdata, flag, rc):
@@ -55,22 +52,26 @@ class DataBase(Process):
             self.isAlive = False
             return
 
-        if msg.topic == "/sensor/msg":
+        if msg.topic == "/server/output":
             value = float(msg.payload.decode("utf-8"))
             self.store_in_memory(value)
 
-        if msg.topic == "/server/getBackup":
+            try:
+                self.RAM = np.append(self.RAM, value)
+
+                if len(self.RAM) >= 10:
+                    self.RAM = np.delete(self.RAM, 0)
+            except:
+                pass
+
+        if msg.topic == "/dataBase/getBackup":
             self.sendBackup()
             return
         return
 
     def sendBackup(self):
-        with open(self.file_path, mode='r') as f:
-            for line in (f.readLines() [-10,:]):
-                value = float(line)
-                self.client.publish("/server/getBackup", value)
-        f.close()
-        pass
+        for value in self.RAM:
+            self.client.publish("/server/getBackup", value)
 
     def store_in_memory(self, value):
         with open(self.file_path, mode='a') as f:
