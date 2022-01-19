@@ -3,6 +3,7 @@ import random as rand
 import time
 import sys
 
+
 class Sensor:
     def __init__(self, ip='127.0.0.255', port=1883):
         self.client = mqtt.Client(client_id="Sensor")
@@ -24,7 +25,7 @@ class Sensor:
 
     # Envoie un nombre aléatoire sur le réseau MQTT
     def send_rand(self):
-        x = rand.uniform(-1,50)
+        x = rand.uniform(-1, 50)
         self.client.publish("/sensor/msg", x)
 
     # Action lorsque le capteur c'est bien connecté au réseau MQTT
