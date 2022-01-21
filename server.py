@@ -1,39 +1,35 @@
-import threading
 import time
+import random as rand
 import paho.mqtt.client as mqtt
-from multiprocessing import Process, Queue
 import numpy as np
 import sys
-
 from scipy import rand
 
 
-class Server(Process):
-    def __init__(self, restart=False, ip="127.0.0.1", port=1883) -> None:
+class Server:
+    def __init__(self, id, restart=False, ip="127.0.0.255", port=1883) -> None:
         self.RAM = np.array([])  # Memoire vive du server
 
         # MQTT
-        self.client = mqtt.Client(client_id="Server")
+        self.client = mqtt.Client(client_id=f"Server {id}")
         self.client.on_connect = self.on_connect
         self.client.on_message = self.on_msg
         self.client.connect(ip, port=port)
 
-        if restart:
-            # On va récup les valeurs dans la backup
-            self.getBackup()
-
-        self.mode = 0  # 0 : Mode PRIMARY / 1 : Mode BACKUP
+        self.mode = restart  # 0 : Mode PRIMARY / 1 : Mode BACKUP
 
         self.port = port
         self.ip = ip
+
+        self.id = id
 
         self.isAlive = False
 
     def start(self):
         self.client.connect(self.ip, port=self.port)
-        self.client.subscribe("/server/kill")
+        self.client.subscribe(f"/server{self.id}/kill")
         self.client.subscribe("/sensor/msg")
-        self.client.subscribe("/server/getBackup")
+        self.client.subscribe(f"/server{self.id}/getBackup")
         self.client.loop_start()
 
         self.isAlive = True
@@ -42,7 +38,7 @@ class Server(Process):
         pass
 
     def on_msg(self, client, userdata, msg) -> None:
-        if msg.topic == "/server/kill":
+        if msg.topic == f"/server{self.id}/kill":
             self.isAlive = False
             return
         if msg.topic == "/sensor/msg":  # on reçoit un message du sensor -> on le stock dans la mémoire vive
@@ -54,7 +50,7 @@ class Server(Process):
                     self.RAM = np.delete(self.RAM, 0)
             except:
                 pass
-        if msg.topic == "/server/getBackup":
+        if msg.topic == f"/server{self.id}/getBackup":
             try:
                 value = float(msg.payload.decode("utf-8"))
                 self.RAM = np.append(self.RAM, value)
@@ -64,28 +60,28 @@ class Server(Process):
             except:
                 pass
 
+            self.mode = 0
+
     def getBackup(self):
-        self.client.publish("/dataBase/getBackup", "True")
+        self.client.publish("/dataBase/getBackup", self.id)
 
     def run(self) -> None:
         while self.isAlive:
-            if self.mode == 0:  # Mode PRIMARY
-                # Watchdog
-                self.coupDePiedAuChienDeGarde()
+            # Watchdog
+            self.coupDePiedAuChienDeGarde()
 
+            if self.mode:
+                # Mode BACKUP
+                self.getBackup()
+            else:
                 # Lecture du capteur
                 # Fait de maniere implicite (stocké dans la RAM)
-                # Calcul 
+                # Calcul
                 value = self.calc_mean_value()
                 # Affichage
-                # print(f"{value}")
-                self.client.publish("/server/output", value)
+                self.client.publish(f"/server{self.id}/output", value)
                 # Stockage
 
-                # print(f'Taille de la mémoire : {len(self.memory)}')
-
-            else:  # Mode BACKUP
-                pass
 
             time.sleep(0.5)
 
@@ -101,16 +97,27 @@ class Server(Process):
             self.isAlive = False
             sys.exit()
 
+    def valueError(self, value) -> float:
+        x = rand.uniform(1, 100)
+
+        if x <= 5:
+            value = value + rand.uniform(-1, 1)
+
+        return value
+
     def coupDePiedAuChienDeGarde(self):
-        self.client.publish("/server/state", "I'm alive")
+        self.client.publish(f"/server{self.id}/state", "I'm alive")
 
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1 and sys.argv[1] == "restart":
-        server = Server(restart=True)
+    if len(sys.argv) == 3 and sys.argv[2] == "restart":
+        server = Server(id=int(sys.argv[1]), restart=True)
+        server.start()
+        server.run()
+    elif len(sys.argv) == 2:
+        server = Server(id=int(sys.argv[1]))
+        server.start()
+        server.run()
     else:
-        server = Server()
-    server.start()
-    server.run()
-
+        print("Usage : python3 server.py <id> [restart]")
     sys.exit()

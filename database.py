@@ -52,7 +52,7 @@ class DataBase(Process):
             self.isAlive = False
             return
 
-        if msg.topic == "/server/output":
+        if msg.topic == "/service/output":
             value = float(msg.payload.decode("utf-8"))
             self.store_in_memory(value)
 
@@ -65,13 +65,14 @@ class DataBase(Process):
                 pass
 
         if msg.topic == "/dataBase/getBackup":
-            self.sendBackup()
+            id = int(msg.payload.decode("utf-8"))
+            self.sendBackup(id)
             return
         return
 
-    def sendBackup(self):
+    def sendBackup(self, id):
         for value in self.RAM:
-            self.client.publish("/server/getBackup", value)
+            self.client.publish(f"/server{id}/getBackup", value)
 
     def store_in_memory(self, value):
         with open(self.file_path, mode='a') as f:

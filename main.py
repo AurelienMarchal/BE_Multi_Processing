@@ -13,4 +13,4 @@ if __name__ == '__main__':
 
     subprocess.Popen("python3 server.py")
     subprocess.Popen("python3 sensor.py")
-    subprocess.Popen("python3 data_base.py")
+    subprocess.Popen("python3 database.py")

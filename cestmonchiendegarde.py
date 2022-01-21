@@ -1,4 +1,6 @@
 import subprocess
+from multiprocessing import Process
+from threading import Thread
 
 import paho.mqtt.client as mqtt
 import random as rand
@@ -7,8 +9,10 @@ import sys
 
 from datetime import datetime
 
-class ChiengDeGarde:
+
+class ChiengDeGarde(Process):
     def __init__(self, ip='127.0.0.255', port=1883):
+        super().__init__()
         self.client = mqtt.Client(client_id="ChiengDeGarde")
         self.client.on_connect = self.on_connect
         self.client.on_message = self.on_message
@@ -17,7 +21,7 @@ class ChiengDeGarde:
         self.port = port
         self.ip = ip
 
-        self.lastPing = datetime.now()
+        self.lastPings = [datetime.now(), datetime.now(), datetime.now()]
 
         self.isAlive = False
 
@@ -25,6 +29,8 @@ class ChiengDeGarde:
         self.client.connect(self.ip, port=self.port)
         self.client.subscribe("/cdg/kill")
         self.client.subscribe("/server0/state")
+        self.client.subscribe("/server1/state")
+        self.client.subscribe("/server2/state")
         self.client.loop_start()
 
         self.isAlive = True
@@ -38,8 +44,12 @@ class ChiengDeGarde:
             self.isAlive = False
             return
 
-        if msg.topic == "/server0/state":
-            self.lastPing = datetime.now()
+        elif msg.topic == "/server0/state":
+            self.lastPings[0] = datetime.now()
+        elif msg.topic == "/server1/state":
+            self.lastPings[1] = datetime.now()
+        elif msg.topic == "/server2/state":
+            self.lastPings[2] = datetime.now()
 
         return
 
@@ -51,11 +61,17 @@ class ChiengDeGarde:
 
     def stalker(self):
         t = datetime.now()
-        d = t - self.lastPing
+        d = [t - self.lastPings[0],
+             t - self.lastPings[1],
+             t - self.lastPings[2]]
 
-        if d.total_seconds() >= 3:
-            print("Wouf, le server est dead")
-            self.client.publish("/server1", "")
+        for i in range(len(d)):
+            if d[i].total_seconds() >= 3:
+                print(f"Wouf, le server {i} est dead")
+
+                thread = Thread(target=lambda: subprocess.run(f"python server.py {i} restart"), daemon=True)
+                thread.start()
+
         pass
 
 
