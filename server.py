@@ -38,7 +38,7 @@ class Server:
         pass
 
     def on_msg(self, client, userdata, msg) -> None:
-        if msg.topic == f"/server{self.id}/kill":
+        if msg.topic == "/server"+str(self.id)+"/kill":
             self.isAlive = False
             return
         if msg.topic == "/sensor/msg":  # on reçoit un message du sensor -> on le stock dans la mémoire vive
@@ -50,7 +50,7 @@ class Server:
                     self.RAM = np.delete(self.RAM, 0)
             except:
                 pass
-        if msg.topic == f"/server{self.id}/getBackup":
+        if msg.topic == "/server"+str(self.id)+"/getBackup":
             try:
                 value = float(msg.payload.decode("utf-8"))
                 self.RAM = np.append(self.RAM, value)

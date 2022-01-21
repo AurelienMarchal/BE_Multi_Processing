@@ -1,4 +1,6 @@
 from multiprocessing import Process
+from threading import Thread
+
 import paho.mqtt.client as mqtt
 import numpy as np
 import os
@@ -9,7 +11,7 @@ import sys
 class DataBase(Process):
     COUNT = 0
 
-    def __init__(self, ip='127.0.0.1', port=1883):
+    def __init__(self, ip='127.0.0.255', port=1883):
         self.RAM = np.array([])  # Memoire vive du server
         self.isAlive = False
 
@@ -24,6 +26,7 @@ class DataBase(Process):
         if not os.path.exists(self.folder):
             os.makedirs(self.folder)
             os.mkdir(self.folder)
+
         with open(self.file_path, mode='w') as f:
             f.write("-- IL S'AGIT DU FICHER DANS LEQUEL LES DONNES SONT STOCKEES --\n")
         f.close()
@@ -35,7 +38,7 @@ class DataBase(Process):
     def start(self):
         self.client.connect(self.ip, port=self.port)
         self.client.subscribe("/dataBase/getBackup")
-        self.client.subscribe("/server/output")
+        self.client.subscribe("/service/output")
         self.client.subscribe("/dataBase/kill")
         self.client.loop_start()
         self.isAlive = True
@@ -48,19 +51,22 @@ class DataBase(Process):
         print("DataBase connecte !")
 
     def on_message(self, client, userdata, msg):
+
         if msg.topic == "/dataBase/kill":
             self.isAlive = False
             return
 
         if msg.topic == "/service/output":
             value = float(msg.payload.decode("utf-8"))
-            self.store_in_memory(value)
-
             try:
                 self.RAM = np.append(self.RAM, value)
 
                 if len(self.RAM) >= 10:
                     self.RAM = np.delete(self.RAM, 0)
+
+                thread = Thread(target=self.store_in_memory(value))
+                thread.start()
+
             except:
                 pass
 
@@ -72,7 +78,8 @@ class DataBase(Process):
 
     def sendBackup(self, id):
         for value in self.RAM:
-            self.client.publish(f"/server{id}/getBackup", value)
+            print(value)
+            self.client.publish(f"/server{id}/getBackup")
 
     def store_in_memory(self, value):
         with open(self.file_path, mode='a') as f:
